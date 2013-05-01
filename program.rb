@@ -290,7 +290,7 @@ class TwtMail
         @auth[:cookie] = File.read(File.join(ENV['TMPDIR'], 'twt_cookie.txt'))
       rescue 
         # Request login and retrieve cookie
-        uri = URI.parse 'https://ssl.twooit.com/interface/loginNew.php'
+        uri = URI.parse 'https://ssl.twooit.com/login.php'  # Old URI: https://ssl.twooit.com/interface/loginNew.php
         data = "username=#{@auth['username']}&passwd=#{@auth['passwd']}"
         header = {
           'Content-Type' => 'application/x-www-form-urlencoded'
