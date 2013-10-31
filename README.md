@@ -1,7 +1,7 @@
 TwooIT Management
 =================
 
-Manage domains and email addresses at TwooIT ISP througgh their API.
+Manage domains and email addresses at TwooIT ISP through their API.
 
 Description
 -----------
