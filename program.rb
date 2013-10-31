@@ -233,30 +233,34 @@ class TwtMail
     end
     
     def get_email_addresses_from_domain wanted_domain
+      STDERR.print "Looking for domain #{wanted_domain}..."
       domain_id = get_domain_id wanted_domain
       domain_id.nil? ? (STDERR.puts('not found!'); return) : STDERR.puts('found!')
       
       begin
-        document = Nokogiri::HTML(fetch_twt_content(URI.parse("https://ssl.twooit.com/interface/loggedSts.php?c=twtEmailAddress&refIdDomain=#{domain_id}&p=0&sc=&s=")))
-        pages = document.css('div#pagetext').first.content.strip.split(/\s/).last.to_i  # Assuming there is only one element returned
-
-        document.css('div.dojoxGridRow').each do |row|
-          email_address_id = row.css('td').first.css('a').attr('href').content.strip.split(/=/).last rescue nil
-          email_address = row.css('td').first.content.strip
-          puts "#{email_address_id}\t#{email_address}"
-        end
+        first_page = Nokogiri::HTML(fetch_twt_content(URI.parse("https://ssl.twooit.com/interface/loggedSts.php?c=twtEmailAddress&refIdDomain=#{domain_id}&p=0")))
+        pages = first_page.css('div.pagination ul li a')
+        tmp = Array.new
+        pages.map {|p| tmp << p if p.css('span').count == 0}
+        pages = tmp # From Nokogiri::XML::NodeSet to Array
+        raise Exception, 'Could not load domain pages' if pages.count == 0
       
-        for i in 1..pages do
-          document = Nokogiri::HTML(fetch_twt_content(URI.parse("https://ssl.twooit.com/interface/loggedSts.php?c=twtEmailAddress&refIdDomain=#{domain_id}&p=#{i}&sc=&s=")))
-      
-          document.css('div.dojoxGridRow').each do |row|
-            email_address_id = row.css('td').first.css('a').attr('href').content.strip.split(/=/).last rescue nil
-            email_address = row.css('td').first.content.strip
-            puts "#{email_address_id}\t#{email_address}"
-          end
+        get_email first_page
+        for i in 1..pages.count-1 do
+          page = Nokogiri::HTML(fetch_twt_content(URI.parse("https://ssl.twooit.com/interface/loggedSts.php?c=twtEmailAddress&refIdDomain=#{domain_id}&p=#{i}")))
+          get_email page
         end
       rescue Exception => exception
         raise exception
+      end
+    end
+    
+    def get_email page
+      page.css('tbody[data-provides="rowlink"] tr.rowlink').each do |row|
+        tds = row.css('td')
+        email_address = tds[0].content.strip
+        email_address_id = tds.css('li a').first.attr('href').strip.split(/=/).last rescue nil
+        puts "#{email_address_id}\t#{email_address}"
       end
     end
     
@@ -349,19 +353,21 @@ class TwtMail
     def get_domain_id wanted_domain
       begin
         cookie_auth
-
-        document = Nokogiri::HTML(fetch_twt_content(URI.parse('https://ssl.twooit.com/interface/loggedSts.php?c=twtDomain&p=0&sc=&s=')))
-        pages = document.css('div#pagetext').first.content.strip.split(/\s/).last.to_i rescue nil # Assuming there is only one element returned
-        raise CookieAuthError unless pages
-
-        STDERR.print 'Looking for domain...'
-        domain_id = find_domain_id(document, wanted_domain)
+        
+        first_page = Nokogiri::HTML(fetch_twt_content(URI.parse('https://ssl.twooit.com/interface/loggedSts?c=twtDomain&p=0')))
+        pages = first_page.css('div.pagination ul li a')
+        tmp = Array.new
+        pages.map {|p| tmp << p if p.css('span').count == 0}
+        pages = tmp # From Nokogiri::XML::NodeSet to Array
+        raise Exception, 'Could not load domain pages' if pages.count == 0
+        
+        domain_id = find_domain_id(first_page, wanted_domain)
         return domain_id unless domain_id.nil?
-
-        for i in 1..pages do
-          document = Nokogiri::HTML(fetch_twt_content(URI.parse("https://ssl.twooit.com/interface/loggedSts.php?c=twtDomain&p=#{i}&sc=&s=")))
+        
+        for i in 1..pages.count-1 do  # Skip first page as it was evaluated before
+          page = Nokogiri::HTML(fetch_twt_content(URI.parse("https://ssl.twooit.com/interface/loggedSts.php?c=twtDomain&p=#{i}")))
           
-          domain_id = find_domain_id(document, wanted_domain)
+          domain_id = find_domain_id(page, wanted_domain)
           return domain_id unless domain_id.nil?
         end
       rescue CookieAuthError => error
@@ -374,10 +380,11 @@ class TwtMail
       return nil
     end
     
-    def find_domain_id document, wanted_domain
-      document.css('div.dojoxGridRow').each do |row|
-        domain_id = row.css('td')[4].css('a').attr('href').content.strip.split(/=/).last rescue nil
-        domain = row.css('td').first.content.strip
+    def find_domain_id page, wanted_domain
+      page.css('tbody[data-provides="rowlink"] tr.rowlink').each do |row|
+        tds = row.css('td')
+        domain = tds[1].content.strip
+        domain_id = tds.css('li a').first.attr('href').strip.split(/=/).last rescue nil
         
         if wanted_domain == domain
           return domain_id
