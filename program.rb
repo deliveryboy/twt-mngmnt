@@ -238,7 +238,7 @@ class TwtMail
       domain_id.nil? ? (STDERR.puts('not found!'); return) : STDERR.puts('found!')
       
       begin
-        first_page = Nokogiri::HTML(fetch_twt_content(URI.parse("https://ssl.twooit.com/interface/loggedSts.php?c=twtEmailAddress&refIdDomain=#{domain_id}&p=0")))
+        first_page = Nokogiri::HTML(fetch_twt_content(URI.parse("https://ssl.twooit.com/loggedSts?c=twtEmailAddress&refIdDomain=#{domain_id}&p=0")))
         pages = first_page.css('div.pagination ul li a')
         tmp = Array.new
         pages.map {|p| tmp << p if p.css('span').count == 0}
@@ -247,7 +247,7 @@ class TwtMail
       
         get_email first_page
         for i in 1..pages.count-1 do
-          page = Nokogiri::HTML(fetch_twt_content(URI.parse("https://ssl.twooit.com/interface/loggedSts.php?c=twtEmailAddress&refIdDomain=#{domain_id}&p=#{i}")))
+          page = Nokogiri::HTML(fetch_twt_content(URI.parse("https://ssl.twooit.com/loggedSts?c=twtEmailAddress&refIdDomain=#{domain_id}&p=#{i}")))
           get_email page
         end
       rescue Exception => exception
@@ -268,13 +268,13 @@ class TwtMail
       begin
         cookie_auth
         
-        document = Nokogiri::HTML(fetch_twt_content(URI.parse('https://ssl.twooit.com/interface/loggedSts.php?c=twtDomain&p=0&sc=&s=')))
+        document = Nokogiri::HTML(fetch_twt_content(URI.parse('https://ssl.twooit.com/loggedSts?c=twtDomain&p=0&sc=&s=')))
         pages = document.css('div#pagetext').first.content.strip.split(/\s/).last.to_i  # Assuming there is only one element returned
         raise CookieAuthError unless pages
         
         print_domain_list document
         for i in 1..pages do
-          document = Nokogiri::HTML(fetch_twt_content(URI.parse("https://ssl.twooit.com/interface/loggedSts.php?c=twtDomain&p=#{i}&sc=&s=")))
+          document = Nokogiri::HTML(fetch_twt_content(URI.parse("https://ssl.twooit.com/loggedSts?c=twtDomain&p=#{i}&sc=&s=")))
           print_domain_list document
         end
       rescue CookieAuthError => error
@@ -294,7 +294,7 @@ class TwtMail
         @auth[:cookie] = File.read(File.join(ENV['TMPDIR'], 'twt_cookie.txt'))
       rescue 
         # Request login and retrieve cookie
-        uri = URI.parse 'https://ssl.twooit.com/login.php'  # Old URI: https://ssl.twooit.com/interface/loginNew.php
+        uri = URI.parse 'https://ssl.twooit.com/login'
         data = "username=#{@auth['username']}&passwd=#{@auth['passwd']}"
         header = {
           'Content-Type' => 'application/x-www-form-urlencoded'
@@ -354,7 +354,7 @@ class TwtMail
       begin
         cookie_auth
         
-        first_page = Nokogiri::HTML(fetch_twt_content(URI.parse('https://ssl.twooit.com/interface/loggedSts?c=twtDomain&p=0')))
+        first_page = Nokogiri::HTML(fetch_twt_content(URI.parse('https://ssl.twooit.com/loggedSts?c=twtDomain&p=0')))
         pages = first_page.css('div.pagination ul li a')
         tmp = Array.new
         pages.map {|p| tmp << p if p.css('span').count == 0}
@@ -365,7 +365,7 @@ class TwtMail
         return domain_id unless domain_id.nil?
         
         for i in 1..pages.count-1 do  # Skip first page as it was evaluated before
-          page = Nokogiri::HTML(fetch_twt_content(URI.parse("https://ssl.twooit.com/interface/loggedSts.php?c=twtDomain&p=#{i}")))
+          page = Nokogiri::HTML(fetch_twt_content(URI.parse("https://ssl.twooit.com/loggedSts?c=twtDomain&p=#{i}")))
           
           domain_id = find_domain_id(page, wanted_domain)
           return domain_id unless domain_id.nil?
