@@ -20,6 +20,12 @@ class CookieAuthError < StandardError
   end
 end
 
+class NoMailboxError < StandardError
+  def initialize domain
+    super("No mailbox for domain #{domain}")
+  end
+end
+
 # Class implementing SOAP methods to be used for mails @ TwooIT
 # https://ssl.twooit.com/helpdesk/index.php?title=SOAP-API_zum_Webinterface
 #
@@ -243,13 +249,15 @@ class TwtMail
         tmp = Array.new
         pages.map {|p| tmp << p if p.css('span').count == 0}
         pages = tmp # From Nokogiri::XML::NodeSet to Array
-        raise Exception, 'Could not load domain pages' if pages.count == 0
+        raise NoMailboxError, wanted_domain if pages.count == 0
       
         get_email first_page
         for i in 1..pages.count-1 do
           page = Nokogiri::HTML(fetch_twt_content(URI.parse("https://ssl.twooit.com/loggedSts?c=twtEmailAddress&refIdDomain=#{domain_id}&p=#{i}")))
           get_email page
         end
+      rescue NoMailboxError => exception
+        puts exception
       rescue Exception => exception
         raise exception
       end
